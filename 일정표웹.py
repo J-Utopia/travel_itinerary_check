@@ -189,8 +189,10 @@ def render_app() -> None:
     )
 
     if not headers_ready:
-        st.warning("서버 인증 헤더가 설정되지 않아 추출을 실행할 수 없습니다.")
-        st.caption(header_status)
+        st.info("일정표 추출 준비 중입니다. 잠시 후 다시 시도해주세요.")
+        with st.expander("관리자 확인"):
+            st.caption(header_status)
+        return
 
     group_input = st.text_input(
         "단체번호",
@@ -200,7 +202,7 @@ def render_app() -> None:
 
     _, button_col, _ = st.columns([1, 2, 1])
     with button_col:
-        extract_clicked = st.button("추출시작", use_container_width=True, disabled=not headers_ready)
+        extract_clicked = st.button("추출시작", use_container_width=True)
 
     if extract_clicked:
         error_message = validate_group_id(group_input)
