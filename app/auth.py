@@ -38,6 +38,27 @@ class HeaderCaptureError(RuntimeError):
     """Raised when required ModeTour request headers cannot be created."""
 
 
+def missing_header_keys(headers: dict[str, str]) -> list[str]:
+    return [key for key in REQUIRED_HEADER_KEYS if not str(headers.get(key, "")).strip()]
+
+
+def header_configuration_status(settings: Settings) -> tuple[bool, str]:
+    env_headers = _build_env_headers(settings)
+    if env_headers is not None:
+        missing = missing_header_keys(env_headers)
+        if missing:
+            return False, "ModeTour header values are incomplete: " + ", ".join(missing)
+        return True, "ModeTour headers are configured."
+
+    cached_headers = _load_cached_headers(settings)
+    if cached_headers is not None:
+        return True, "ModeTour headers are configured."
+
+    if settings.header_cache_json.strip():
+        return False, "MODETOUR_HEADER_CACHE_JSON is invalid or missing required keys."
+    return False, "Set MODETOUR_HEADER_CACHE_JSON or MODETOUR_MODEWEBAPIREQHEADER in Streamlit Secrets."
+
+
 def _ensure_playwright_subprocess_event_loop() -> None:
     if sys.platform != "win32":
         return
@@ -74,7 +95,7 @@ def _load_cached_headers(settings: Settings) -> dict[str, str] | None:
         except Exception:
             data = None
         if isinstance(data, dict):
-            if all(str(data.get(key, "")).strip() for key in REQUIRED_HEADER_KEYS):
+            if not missing_header_keys({key: str(data.get(key, "")) for key in HEADER_KEYS}):
                 return {key: str(data.get(key, "")) for key in HEADER_KEYS}
 
     cache_path = settings.header_cache_path
@@ -86,7 +107,7 @@ def _load_cached_headers(settings: Settings) -> dict[str, str] | None:
         return None
     if not isinstance(data, dict):
         return None
-    if any(not str(data.get(key, "")).strip() for key in REQUIRED_HEADER_KEYS):
+    if missing_header_keys({key: str(data.get(key, "")) for key in HEADER_KEYS}):
         return None
     return {key: str(data.get(key, "")) for key in HEADER_KEYS}
 

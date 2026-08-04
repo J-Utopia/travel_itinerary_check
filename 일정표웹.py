@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import importlib.util
 import json
@@ -8,6 +8,9 @@ from types import ModuleType
 from typing import Any
 
 import streamlit as st
+
+from app.auth import header_configuration_status
+from app.config import settings
 
 
 GPTS_URL = "https://chatgpt.com/g/g-6a70449513408191a61cf43948a1ecf2-iljeongpyogeomsu-3-0"
@@ -177,12 +180,17 @@ def render_style() -> None:
 def render_app() -> None:
     st.set_page_config(page_title="일정표 데이터 추출", page_icon="📄", layout="centered")
     render_style()
+    headers_ready, header_status = header_configuration_status(settings)
 
     st.markdown('<h1 class="hero-title">일정표 데이터 추출</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="hero-copy">단체번호를 입력하면 일정표 검수용 JSON 파일을 생성합니다. 생성 후 검수 진행 해주세요</p>',
         unsafe_allow_html=True,
     )
+
+    if not headers_ready:
+        st.warning("서버 인증 헤더가 설정되지 않아 추출을 실행할 수 없습니다.")
+        st.caption(header_status)
 
     group_input = st.text_input(
         "단체번호",
@@ -192,7 +200,7 @@ def render_app() -> None:
 
     _, button_col, _ = st.columns([1, 2, 1])
     with button_col:
-        extract_clicked = st.button("추출시작", use_container_width=True)
+        extract_clicked = st.button("추출시작", use_container_width=True, disabled=not headers_ready)
 
     if extract_clicked:
         error_message = validate_group_id(group_input)
