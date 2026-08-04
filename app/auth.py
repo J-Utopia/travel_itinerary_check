@@ -32,6 +32,7 @@ REQUIRED_HEADER_KEYS = (
     "x-salespartner",
     "modewebapireqheader",
 )
+CAPTURE_HEADER_KEY = "modewebapireqheader"
 
 
 class HeaderCaptureError(RuntimeError):
@@ -118,6 +119,20 @@ def _save_cached_headers(settings: Settings, headers: dict[str, str]) -> None:
     cache_path.write_text(json.dumps(headers, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _headers_with_modeweb(headers: dict[str, str]) -> dict[str, str] | None:
+    normalized = {str(key).lower(): str(value) for key, value in headers.items()}
+    if not normalized.get(CAPTURE_HEADER_KEY, "").strip():
+        return None
+    return normalized
+
+
+def _summarize_observed_requests(requests: list[str]) -> str:
+    if not requests:
+        return "No ModeTour API requests were observed."
+    unique = list(dict.fromkeys(requests))
+    return "Observed ModeTour API requests: " + " | ".join(unique[:12])
+
+
 def _capture_headers_with_playwright(settings: Settings, force_refresh: bool) -> dict[str, str]:
     try:
         from playwright.sync_api import sync_playwright
@@ -129,11 +144,28 @@ def _capture_headers_with_playwright(settings: Settings, force_refresh: bool) ->
     _ensure_playwright_subprocess_event_loop()
 
     captured: dict[str, str] = {}
+    observed_requests: list[str] = []
 
     def on_request(req: Any) -> None:
         nonlocal captured
-        if "/Package/GetProductMaster" in req.url and req.method.upper() == "POST":
-            captured = dict(req.headers)
+        if "modetour.com" not in req.url:
+            return
+        if "b2c-api.modetour.com" in req.url or "/Package/" in req.url or "/Coupon/" in req.url:
+            observed_requests.append(f"{req.method.upper()} {req.url}")
+        headers = _headers_with_modeweb(dict(req.headers))
+        if headers is not None:
+            captured = headers
+
+    def on_response(response: Any) -> None:
+        nonlocal captured
+        if captured or "modetour.com" not in response.url:
+            return
+        try:
+            headers = _headers_with_modeweb(dict(response.request.headers))
+        except Exception:
+            return
+        if headers is not None:
+            captured = headers
 
     page_url = f"https://www.modetour.com/product-common/{settings.seed_mat_code}?type=single"
     logger.info("Capturing ModeTour headers from %s force_refresh=%s", page_url, force_refresh)
@@ -157,15 +189,24 @@ def _capture_headers_with_playwright(settings: Settings, force_refresh: bool) ->
             browser = playwright.chromium.launch(headless=True)
         page = browser.new_page()
         page.on("request", on_request)
+        page.on("response", on_response)
         try:
-            page.goto(page_url, wait_until="domcontentloaded", timeout=settings.capture_timeout_ms)
+            page.goto(page_url, wait_until="networkidle", timeout=settings.capture_timeout_ms)
         except Exception:
             logger.info("Navigation timed out while capturing headers; continuing if request data was captured.")
-        page.wait_for_timeout(settings.capture_wait_ms)
+        if not captured:
+            try:
+                page.mouse.wheel(0, 900)
+                page.wait_for_load_state("networkidle", timeout=min(settings.capture_timeout_ms, 15000))
+            except Exception:
+                logger.info("Interaction timed out while capturing headers; continuing if request data was captured.")
+        if not captured:
+            page.wait_for_timeout(settings.capture_wait_ms)
         browser.close()
 
     modeweb = captured.get("modewebapireqheader", "")
     if not modeweb:
+        logger.warning(_summarize_observed_requests(observed_requests))
         raise HeaderCaptureError("Failed to capture modewebapireqheader from ModeTour page.")
     headers = {
         "accept": captured.get("accept", settings.accept),
