@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import logging
 import re
 from pathlib import Path
 from types import ModuleType
@@ -10,6 +11,7 @@ from typing import Any
 import streamlit as st
 
 
+logger = logging.getLogger(__name__)
 GPTS_URL = "https://chatgpt.com/g/g-6a70449513408191a61cf43948a1ecf2-iljeongpyogeomsu-3-0"
 SCRIPT_PATH = Path(__file__).with_name("일정표데이터추출.py")
 
@@ -204,10 +206,10 @@ def render_app() -> None:
                 try:
                     filename, payload, data = build_json_download(group_id)
                 except Exception as exc:
+                    logger.exception("Itinerary extraction failed.")
                     st.error(
-                        "일정표 추출에 실패했습니다. 서버 인증 헤더 또는 모두투어 API 상태를 확인해야 합니다."
+                        "일정표 추출에 실패했습니다. 잠시 후 다시 시도해주세요."
                     )
-                    st.caption(str(exc))
                 else:
                     st.session_state["download"] = {
                         "filename": filename,
