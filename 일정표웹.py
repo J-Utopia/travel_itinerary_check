@@ -1,5 +1,15 @@
-﻿from __future__ import annotations
+﻿# cd C:\Users\jeonuk\Desktop\Project\Python\ModewareBusiness\일정표검수
+# python -m streamlit run .\일정표데이터추출\일정표웹.py
+# https://travelitinerarycheck.streamlit.app/
 
+#깃 커밋
+# cd C:\Users\jeonuk\Desktop\Project\Python\ModewareBusiness\일정표검수\일정표데이터추출
+# git status
+# git add 일정표웹.py
+# git commit -m "Update app text"
+# git push
+
+from __future__ import annotations
 import importlib.util
 import json
 import logging
@@ -182,7 +192,7 @@ def render_app() -> None:
 
     st.markdown('<h1 class="hero-title">일정표 데이터 추출</h1>', unsafe_allow_html=True)
     st.markdown(
-        '<p class="hero-copy">단체번호를 입력하면 일정표 검수용 JSON 파일을 생성합니다. 생성 후 검수 진행 해주세요</p>',
+        '<p class="hero-copy">단체번호를 입력하면 일정표 검수용 파일을 생성합니다. 생성 후 검수 진행 해주세요</p>',
         unsafe_allow_html=True,
     )
 
@@ -224,7 +234,7 @@ def render_app() -> None:
             """
             <div class="result-box">
               <p class="result-title">추출완료</p>
-              <p class="result-copy">다운로드받으시겠습니까?</p>
+              <p class="result-copy">다운로드받으시겠습니까? 파일 다운 후 아래 설명에따라 진행해주세요</p>
             </div>
             """,
             unsafe_allow_html=True,
