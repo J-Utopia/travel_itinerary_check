@@ -8,10 +8,22 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parents[1]
 
 
+def _has_streamlit_secrets_file() -> bool:
+    return any(
+        path.exists()
+        for path in (
+            BASE_DIR / ".streamlit" / "secrets.toml",
+            Path.home() / ".streamlit" / "secrets.toml",
+        )
+    )
+
+
 def _setting(name: str, default: str = "") -> str:
     value = os.getenv(name)
     if value is not None:
         return value
+    if not _has_streamlit_secrets_file():
+        return default
     try:
         import streamlit as st
 
