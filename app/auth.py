@@ -123,7 +123,7 @@ def _capture_headers_with_playwright(settings: Settings, force_refresh: bool) ->
         from playwright.sync_api import sync_playwright
     except Exception as exc:  # pragma: no cover - depends on local install
         raise HeaderCaptureError(
-            "ModeTour headers are not configured. Set MODETOUR_HEADER_CACHE_JSON in Streamlit Secrets."
+            "Playwright is required to capture ModeTour headers automatically."
         ) from exc
 
     _ensure_playwright_subprocess_event_loop()
@@ -145,11 +145,15 @@ def _capture_headers_with_playwright(settings: Settings, force_refresh: bool) ->
             if "Executable doesn't exist" not in message and "Please run the following command" not in message:
                 raise
             logger.warning("Playwright Chromium is missing; installing browser runtime once.")
-            subprocess.run(
-                [sys.executable, "-m", "playwright", "install", "chromium"],
-                cwd=settings.base_dir,
-                check=True,
-            )
+            try:
+                subprocess.run(
+                    [sys.executable, "-m", "playwright", "install", "chromium"],
+                    cwd=settings.base_dir,
+                    check=True,
+                    timeout=180,
+                )
+            except Exception as install_exc:
+                raise HeaderCaptureError("Failed to install Playwright Chromium for automatic header capture.") from install_exc
             browser = playwright.chromium.launch(headless=True)
         page = browser.new_page()
         page.on("request", on_request)

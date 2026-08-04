@@ -176,23 +176,13 @@ def render_style() -> None:
 
 def render_app() -> None:
     st.set_page_config(page_title="일정표 데이터 추출", page_icon="📄", layout="centered")
-    from app.auth import header_configuration_status
-    from app.config import settings
-
     render_style()
-    headers_ready, header_status = header_configuration_status(settings)
 
     st.markdown('<h1 class="hero-title">일정표 데이터 추출</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="hero-copy">단체번호를 입력하면 일정표 검수용 JSON 파일을 생성합니다. 생성 후 검수 진행 해주세요</p>',
         unsafe_allow_html=True,
     )
-
-    if not headers_ready:
-        st.info("일정표 추출 준비 중입니다. 잠시 후 다시 시도해주세요.")
-        with st.expander("관리자 확인"):
-            st.caption(header_status)
-        return
 
     group_input = st.text_input(
         "단체번호",
