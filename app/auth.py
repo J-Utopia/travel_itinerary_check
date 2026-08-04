@@ -101,7 +101,9 @@ def _capture_headers_with_playwright(settings: Settings, force_refresh: bool) ->
     try:
         from playwright.sync_api import sync_playwright
     except Exception as exc:  # pragma: no cover - depends on local install
-        raise HeaderCaptureError("Playwright is required to capture ModeTour headers.") from exc
+        raise HeaderCaptureError(
+            "ModeTour headers are not configured. Set MODETOUR_HEADER_CACHE_JSON in Streamlit Secrets."
+        ) from exc
 
     _ensure_playwright_subprocess_event_loop()
 
@@ -198,6 +200,8 @@ def capture_base_headers(settings: Settings, force_refresh: bool = False) -> dic
 
     try:
         return _capture_headers_with_playwright(settings, force_refresh)
+    except HeaderCaptureError:
+        raise
     except (NotImplementedError, RuntimeError) as exc:
         if os.getenv("MODETOUR_HEADER_CAPTURE_CHILD") == "1":
             raise HeaderCaptureError("Playwright cannot run in this Python event loop policy.") from exc
