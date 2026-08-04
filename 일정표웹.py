@@ -9,9 +9,6 @@ from typing import Any
 
 import streamlit as st
 
-from app.auth import header_configuration_status
-from app.config import settings
-
 
 GPTS_URL = "https://chatgpt.com/g/g-6a70449513408191a61cf43948a1ecf2-iljeongpyogeomsu-3-0"
 SCRIPT_PATH = Path(__file__).with_name("일정표데이터추출.py")
@@ -179,6 +176,9 @@ def render_style() -> None:
 
 def render_app() -> None:
     st.set_page_config(page_title="일정표 데이터 추출", page_icon="📄", layout="centered")
+    from app.auth import header_configuration_status
+    from app.config import settings
+
     render_style()
     headers_ready, header_status = header_configuration_status(settings)
 
