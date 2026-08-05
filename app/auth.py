@@ -119,10 +119,44 @@ def _save_cached_headers(settings: Settings, headers: dict[str, str]) -> None:
     cache_path.write_text(json.dumps(headers, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _normalize_modeweb_value(value: str) -> str | None:
+    cleaned = str(value or "").strip()
+    if not cleaned:
+        return None
+    try:
+        parsed = json.loads(cleaned)
+    except Exception:
+        return cleaned
+    if not isinstance(parsed, dict):
+        return None
+    if not str(parsed.get("ApiKey", "")).strip():
+        return None
+    return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
+
+
+def _headers_from_modeweb_value(settings: Settings, value: str) -> dict[str, str] | None:
+    modeweb = _normalize_modeweb_value(value)
+    if modeweb is None:
+        return None
+    return {
+        "accept": settings.accept,
+        "referer": settings.referer,
+        "user-agent": settings.user_agent,
+        "x-platform": settings.x_platform,
+        "x-salespartner": settings.x_salespartner,
+        "x-username": settings.x_username,
+        "x-userid": settings.x_userid,
+        "x-userdepartment": settings.x_userdepartment,
+        "modewebapireqheader": modeweb,
+    }
+
+
 def _headers_with_modeweb(headers: dict[str, str]) -> dict[str, str] | None:
     normalized = {str(key).lower(): str(value) for key, value in headers.items()}
-    if not normalized.get(CAPTURE_HEADER_KEY, "").strip():
+    modeweb = _normalize_modeweb_value(normalized.get(CAPTURE_HEADER_KEY, ""))
+    if modeweb is None:
         return None
+    normalized[CAPTURE_HEADER_KEY] = modeweb
     return normalized
 
 
@@ -131,6 +165,22 @@ def _summarize_observed_requests(requests: list[str]) -> str:
         return "No ModeTour API requests were observed."
     unique = list(dict.fromkeys(requests))
     return "Observed ModeTour API requests: " + " | ".join(unique[:12])
+
+
+def _capture_headers_from_browser_storage(page: Any, settings: Settings) -> dict[str, str] | None:
+    for storage_name in ("localStorage", "sessionStorage"):
+        try:
+            modeweb = page.evaluate(
+                "(storageName) => window[storageName].getItem('ModeWebApiReqHeader')",
+                storage_name,
+            )
+        except Exception:
+            continue
+        headers = _headers_from_modeweb_value(settings, str(modeweb or ""))
+        if headers is not None:
+            logger.info("Captured ModeTour headers from browser %s.", storage_name)
+            return headers
+    return None
 
 
 def _capture_headers_with_playwright(settings: Settings, force_refresh: bool) -> dict[str, str]:
@@ -202,6 +252,10 @@ def _capture_headers_with_playwright(settings: Settings, force_refresh: bool) ->
                 logger.info("Interaction timed out while capturing headers; continuing if request data was captured.")
         if not captured:
             page.wait_for_timeout(settings.capture_wait_ms)
+        if not captured:
+            storage_headers = _capture_headers_from_browser_storage(page, settings)
+            if storage_headers is not None:
+                captured = storage_headers
         browser.close()
 
     modeweb = captured.get("modewebapireqheader", "")
