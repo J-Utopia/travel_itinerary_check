@@ -20,6 +20,9 @@ from typing import Any
 
 import streamlit as st
 
+from app.auth import header_configuration_status
+from app.config import settings
+
 
 logger = logging.getLogger(__name__)
 GPTS_URL = "https://chatgpt.com/g/g-6a70449513408191a61cf43948a1ecf2-iljeongpyogeomsu-3-0"
@@ -46,6 +49,19 @@ def validate_group_id(value: str) -> str | None:
     if len(group_id) < 6 or len(group_id) > 12:
         return "단체번호는 숫자 6~12자리로 입력해주세요."
     return None
+
+
+def extraction_error_message(exc: Exception) -> str:
+    detail = str(exc).strip()
+    if not detail:
+        return "일정표 추출에 실패했습니다. 서버 로그를 확인해주세요."
+    if "modewebapireqheader" in detail.lower() or "modetour header" in detail.lower():
+        return (
+            "모두투어 API 인증 헤더를 만들 수 없습니다. "
+            "Streamlit Secrets에 MODETOUR_HEADER_CACHE_JSON 또는 "
+            "MODETOUR_MODEWEBAPIREQHEADER 값을 설정해주세요."
+        )
+    return f"일정표 추출에 실패했습니다. 원인: {detail}"
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -195,6 +211,9 @@ def render_app() -> None:
         '<p class="hero-copy">단체번호를 입력하면 일정표 검수용 파일을 생성합니다. 생성 후 검수 진행 해주세요</p>',
         unsafe_allow_html=True,
     )
+    headers_ready, headers_message = header_configuration_status(settings)
+    if not headers_ready:
+        st.warning(headers_message)
 
     group_input = st.text_input(
         "단체번호",
@@ -217,9 +236,7 @@ def render_app() -> None:
                     filename, payload, data = build_json_download(group_id)
                 except Exception as exc:
                     logger.exception("Itinerary extraction failed.")
-                    st.error(
-                        "일정표 추출에 실패했습니다. 잠시 후 다시 시도해주세요."
-                    )
+                    st.error(extraction_error_message(exc))
                 else:
                     st.session_state["download"] = {
                         "filename": filename,
